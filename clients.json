@@ -1,18 +1,18 @@
 [
   {
-    "id": "kashmir_gems",
-    "name": "Kashmir Gems",
-    "url": "https://kashmirgems.co.uk",
-    "wp_root": "/",
-    "notify_email": "developers@allatifsofts.com",
-    "active": true
-  },
-  {
     "id": "camali_bijoux",
     "name": "Camali Bijoux",
     "url": "https://camalibijoux.com",
     "wp_root": "public_html",
-    "notify_email": "developers@allatifsofts.com",
+    "notify_email": "muhammadriasatali40@gmail.com",
+    "active": true
+  },
+  {
+    "id": "digitalmarketer_gurus",
+    "name": "Digital Marketer Gurus",
+    "url": "https://digitalmarketergurus.com",
+    "wp_root": "public_html",
+    "notify_email": "muhammadriasatali40@gmail.com",
     "active": true
   }
 ]
