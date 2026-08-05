@@ -20,52 +20,60 @@ if (empty($provided_token) || !hash_equals(BRIDGE_SECRET, $provided_token)) {
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
-set_time_limit(120);
+set_time_limit(300);
 ini_set('memory_limit', '512M');
 error_reporting(0);
-header('Content-Type: application/json');
+ob_start();
 
 $root     = __DIR__;
 $action   = $_POST['action'] ?? 'ping';
 
 // ─── Router ──────────────────────────────────────────────────────────────────
+$response_data = null;
+
 switch ($action) {
 
     // ── PING: verify bridge is alive ──────────────────────────────────────────
     case 'ping':
-        echo json_encode([
+        $response_data = [
             'status'   => 'ok',
             'wp_root'  => $root,
             'php_ver'  => PHP_VERSION,
             'time'     => date('c'),
-        ]);
+        ];
         break;
 
     // ── SCAN: full malware scan (Layer 5) ─────────────────────────────────────
     case 'scan':
-        echo json_encode(sentrywp_scan($root));
+        $response_data = sentrywp_scan($root);
         break;
 
     // ── HARDEN: write security .htaccess files (Layers 1 & 2) ────────────────
     case 'harden':
-        echo json_encode(sentrywp_harden($root));
+        $response_data = sentrywp_harden($root);
         break;
 
     // ── SHIELD: deploy firewall to mu-plugins (Layer 3) ──────────────────────
     case 'shield':
         $shield_content = $_POST['shield_content'] ?? '';
-        echo json_encode(sentrywp_deploy_shield($root, $shield_content));
+        $response_data = sentrywp_deploy_shield($root, $shield_content);
         break;
 
     // ── CLEANUP: delete confirmed malicious files (Layer 5) ───────────────────
     case 'cleanup':
         $files = json_decode($_POST['files'] ?? '[]', true);
-        echo json_encode(sentrywp_cleanup($root, $files));
+        $response_data = sentrywp_cleanup($root, $files);
         break;
 
     default:
-        echo json_encode(['error' => 'Unknown action: ' . htmlspecialchars($action)]);
+        $response_data = ['error' => 'Unknown action: ' . htmlspecialchars($action)];
 }
+
+// Clean any buffer noise (PHP warnings, notices) and output pure JSON
+ob_end_clean();
+header('Content-Type: application/json');
+echo json_encode($response_data);
+exit;
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
