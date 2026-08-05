@@ -95,34 +95,41 @@ def analyse_with_gemini(site_name: str, scan_data: dict) -> dict:
         },
     }
 
-    try:
-        url     = GEMINI_URL.format(key=GEMINI_API_KEY)
-        data    = json.dumps(payload).encode("utf-8")
-        req     = urllib.request.Request(
+    models_to_try = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-2.5-flash-lite"
+    ]
+
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
             url,
             data=data,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
 
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            body     = json.loads(resp.read().decode("utf-8"))
-            raw_text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body     = json.loads(resp.read().decode("utf-8"))
+                raw_text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-            # Strip markdown fences if Gemini wraps in ```json
-            if raw_text.startswith("```"):
-                raw_text = raw_text.split("```")[1]
-                if raw_text.startswith("json"):
-                    raw_text = raw_text[4:]
+                if raw_text.startswith("```"):
+                    raw_text = raw_text.split("```")[1]
+                    if raw_text.startswith("json"):
+                        raw_text = raw_text[4:]
 
-            ai_result = json.loads(raw_text)
-            return ai_result
-
-    except urllib.error.HTTPError as e:
-        print(f"  [-] Gemini API HTTP error: {e.code} — {e.read().decode()[:200]}")
-    except json.JSONDecodeError as e:
-        print(f"  [-] Gemini returned invalid JSON: {e}")
-    except Exception as e:
-        print(f"  [-] Gemini API error: {e}")
+                ai_result = json.loads(raw_text)
+                return ai_result
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode("utf-8", errors="ignore")
+            print(f"  [-] Gemini API ({model}) HTTP {e.code}: {err_msg[:150]}")
+            if e.code == 429:
+                continue # Try next model if quota hit
+        except Exception as e:
+            print(f"  [-] Gemini API ({model}) error: {e}")
 
     return fallback

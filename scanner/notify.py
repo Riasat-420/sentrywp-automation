@@ -32,11 +32,21 @@ ULTRAMSG_INSTANCE  = os.environ.get("ULTRAMSG_INSTANCE", "")   # e.g. instance12
 ULTRAMSG_TOKEN     = os.environ.get("ULTRAMSG_TOKEN", "")       # API token
 WHATSAPP_NUMBER    = os.environ.get("WHATSAPP_NUMBER", "")      # e.g. 923001234567
 
-# Gmail SMTP
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
+# SMTP Credentials (Hostinger or Gmail)
+def _get_clean_env(key: str, default: str = "") -> str:
+    val = os.environ.get(key, default).strip().strip('"').strip("'")
+    if "://" in val:
+        val = val.split("://")[-1].split("/")[0]
+    return val
+
+SMTP_HOST = _get_clean_env("SMTP_HOST", "smtp.hostinger.com")
+try:
+    SMTP_PORT = int(_get_clean_env("SMTP_PORT", "465"))
+except ValueError:
+    SMTP_PORT = 465
+
+SMTP_USER = _get_clean_env("SMTP_USER", "")
+SMTP_PASS = _get_clean_env("SMTP_PASS", "")
 
 
 # ─── Severity → Emoji mapping ─────────────────────────────────────────────────
