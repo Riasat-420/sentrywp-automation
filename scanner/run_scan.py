@@ -205,7 +205,8 @@ def main():
             # Silent — just log
             pass
         else:
-            send_all_alerts(result)
+            client = next((c for c in clients if c["id"] == result["site_id"]), None)
+            send_all_alerts(result, client)
 
         # Log every result to Google Sheets
         log_to_sheet(result)

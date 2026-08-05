@@ -183,11 +183,62 @@ def send_whatsapp_alert(result: dict) -> bool:
         return False
 
 
-def send_all_alerts(result: dict) -> None:
+def send_instant_email_alert(result: dict, client: dict = None) -> bool:
+    """Send instant email alert when threat is detected."""
+    if not SMTP_USER or not SMTP_PASS:
+        print("  ⚠️  Email alert not configured (SMTP_USER / SMTP_PASS missing)")
+        return False
+
+    to_email = (client.get("notify_email") if client else None) or "muhammadriasatali40@gmail.com"
+    site_name = result.get("site_name", "WordPress Site")
+    ai        = result.get("ai") or {}
+    severity  = ai.get("severity", "unknown").upper()
+    actions   = result.get("actions", [])
+
+    subject = f"🚨 SentryWP Threat Alert [{severity}] — {site_name}"
+    body_text = f"""SentryWP Security Threat Alert
+====================================
+Site: {site_name} ({result.get('url', '')})
+Status/Severity: {severity}
+AI Confidence: {ai.get('confidence', 0):.0%}
+Threat Description: {ai.get('threat_type', 'Malware / Code Anomaly Detected')}
+
+Summary:
+{ai.get('summary', 'No detailed summary provided.')}
+
+Actions Taken:
+{chr(10).join(['  • ' + str(a) for a in actions]) if actions else '  • Manual Review Required (Medium Severity)'}
+
+Timestamp: {result.get('timestamp', '')} UTC
+
+--
+SentryWP Automation by Muhammad Riasat Ali
+Web Developer & WordPress Security Specialist
+"""
+
+    msg = MIMEMultipart()
+    msg["From"]    = SMTP_USER
+    msg["To"]      = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body_text, "plain"))
+
+    try:
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx, timeout=15) as server:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+        print(f"  📧 Instant threat alert emailed to {to_email}")
+        return True
+    except Exception as e:
+        print(f"  [-] Email send failed: {e}")
+        return False
+
+
+def send_all_alerts(result: dict, client: dict = None) -> None:
     """
     Fire all configured notification channels simultaneously.
-    Telegram + WhatsApp both send if credentials are set.
-    Either one failing does NOT block the other.
+    Telegram + WhatsApp + Email all send if credentials are set.
+    Either one failing does NOT block the others.
     """
     ai       = result.get("ai") or {}
     severity = ai.get("severity", "unknown")
@@ -197,6 +248,7 @@ def send_all_alerts(result: dict) -> None:
 
     send_telegram_alert(result)
     send_whatsapp_alert(result)
+    send_instant_email_alert(result, client)
 
 
 def send_email_report(pdf_path: Path, client: dict, result: dict) -> bool:
