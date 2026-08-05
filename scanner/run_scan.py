@@ -14,10 +14,18 @@ import shutil
 import datetime
 from pathlib import Path
 
+# Force UTF-8 stdout/stderr for Windows compatibility
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scanner.ftp_handler import FTPHandler
+from scanner.bridge_handler import BridgeHandler
 from scanner.ai_analysis import analyse_with_gemini
 from scanner.autofix import run_autofix
 from scanner.notify import send_all_alerts, send_email_report
@@ -65,20 +73,15 @@ def load_ftp_credentials():
 
 # ─── Per-site scan pipeline ───────────────────────────────────────────────────
 
-def scan_site(client: dict, creds: dict) -> dict:
+def scan_site(client: dict) -> dict:
     site_id   = client["id"]
     site_name = client["name"]
     site_url  = client["url"].rstrip("/")
-    wp_root   = client.get("wp_root", "/")
-
-    ftp_host = creds.get("ftp_host", "")
-    ftp_user = creds.get("ftp_user", "")
-    ftp_pass = creds.get("ftp_pass", "")
 
     timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     print(f"\n{'='*60}")
     print(f"  🔍 Scanning: {site_name} ({site_url})")
-    print(f"  FTP: {ftp_user}@{ftp_host}")
+    print(f"  Mode: HTTP Bridge Endpoint")
     print(f"{'='*60}")
 
     result = {
@@ -87,49 +90,28 @@ def scan_site(client: dict, creds: dict) -> dict:
         "url":       site_url,
         "timestamp": timestamp,
         "scan_mode": SCAN_MODE,
-        "ftp_ok":    False,
+        "bridge_ok": False,
         "scan_data": None,
         "ai":        None,
         "actions":   [],
         "error":     None,
     }
 
-    # ── Step 1: FTP Connection ────────────────────────────────────────────────
-    ftp = FTPHandler(ftp_host, ftp_user, ftp_pass)
-    if not ftp.connect():
-        result["error"] = "FTP connection failed"
-        print(f"  ❌ FTP failed for {site_name}")
+    # ── Step 1: HTTP Bridge Connection ─────────────────────────────────────────
+    bridge = BridgeHandler(site_url)
+    if not bridge.ping():
+        result["error"] = "HTTP Bridge connection failed (timed out or invalid token)"
+        print(f"  ❌ Bridge ping failed for {site_name}")
         return result
 
-    result["ftp_ok"] = True
-    print(f"  ✅ FTP connected")
+    result["bridge_ok"] = True
 
-    # ── Step 2: Upload & Run Scanner (Security Layer 5) ───────────────────────
-    scanner_remote = f"{wp_root.rstrip('/')}/sentrywp_scan_{timestamp}.php"
-    scanner_url    = f"{site_url}/sentrywp_scan_{timestamp}.php"
-
-    print(f"  📤 Uploading scanner...")
-    upload_ok = ftp.upload_file(str(SCANNER_PHP), scanner_remote)
-    if not upload_ok:
-        result["error"] = "Scanner upload failed"
-        ftp.close()
-        return result
-
-    # Give server a moment to register the file
-    time.sleep(2)
-
-    print(f"  🌐 Running scanner via HTTP...")
-    scan_data = ftp.http_get_json(scanner_url)
-
-    # Scanner self-deletes, but try via FTP too as backup
-    try:
-        ftp.delete_file(scanner_remote)
-    except Exception:
-        pass  # Already self-deleted
+    # ── Step 2: Run Malware Scan via HTTP Bridge (Security Layer 5) ────────────
+    print(f"  🌐 Executing security scan via HTTP Bridge...")
+    scan_data = bridge.scan()
 
     if scan_data is None:
-        result["error"] = "Scanner returned no data (HTTP failed)"
-        ftp.close()
+        result["error"] = "Scanner returned no data (HTTP bridge scan failed)"
         return result
 
     result["scan_data"] = scan_data
@@ -159,7 +141,7 @@ def scan_site(client: dict, creds: dict) -> dict:
     if severity in ("critical", "high"):
         print(f"  🔧 Severity={severity.upper()} — firing auto-fix pipeline...")
         actions = run_autofix(
-            ftp=ftp,
+            bridge=bridge,
             client=client,
             scan_data=scan_data,
             severity=severity,
@@ -170,8 +152,6 @@ def scan_site(client: dict, creds: dict) -> dict:
     elif severity == "medium":
         print(f"  ⚠️  Severity=MEDIUM — alerting only, no auto-fix (requires manual review)")
         result["actions"] = ["alert_only"]
-
-    ftp.close()
 
     # ── Step 5: Save raw result JSON ─────────────────────────────────────────
     RESULTS_DIR.mkdir(exist_ok=True)
@@ -206,14 +186,7 @@ def main():
     critical_sites = []
 
     for client in clients:
-        site_id = client["id"]
-        creds   = all_creds.get(site_id)
-
-        if not creds:
-            print(f"\n  ⚠️  No FTP credentials found for '{site_id}' in SITES_CONFIG secret — skipping.")
-            continue
-
-        result = scan_site(client, creds)
+        result = scan_site(client)
         all_results.append(result)
 
         severity = (result.get("ai") or {}).get("severity", "unknown")
