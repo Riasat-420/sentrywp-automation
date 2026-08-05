@@ -137,9 +137,9 @@ def scan_site(client: dict) -> dict:
         severity = "clean"
         print(f"  ✅ AI: CLEAN — no threats detected")
 
-    # ── Step 4: Auto-Fix (if needed) ─────────────────────────────────────────
-    if severity in ("critical", "high"):
-        print(f"  🔧 Severity={severity.upper()} — firing auto-fix pipeline...")
+    # ── Step 4: Auto-Fix (Malware Cleanup & Hardening) ──────────────────────
+    if total_flags > 0:
+        print(f"  🔧 Threats detected ({total_flags} flags, {len(bad_uploads)} malicious uploads) — firing Auto-Fix Pipeline...")
         actions = run_autofix(
             bridge=bridge,
             client=client,
@@ -149,9 +149,8 @@ def scan_site(client: dict) -> dict:
             timestamp=timestamp,
         )
         result["actions"] = actions
-    elif severity == "medium":
-        print(f"  ⚠️  Severity=MEDIUM — alerting only, no auto-fix (requires manual review)")
-        result["actions"] = ["alert_only"]
+    else:
+        result["actions"] = ["clean_no_action_needed"]
 
     # ── Step 5: Save raw result JSON ─────────────────────────────────────────
     RESULTS_DIR.mkdir(exist_ok=True)
