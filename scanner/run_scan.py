@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from scanner.ftp_handler import FTPHandler
 from scanner.ai_analysis import analyse_with_gemini
 from scanner.autofix import run_autofix
-from scanner.notify import send_telegram_alert, send_email_report
+from scanner.notify import send_all_alerts, send_email_report
 from scanner.logger import log_to_sheet
 from scanner.report import generate_pdf_report
 
@@ -232,7 +232,7 @@ def main():
             # Silent — just log
             pass
         else:
-            send_telegram_alert(result)
+            send_all_alerts(result)
 
         # Log every result to Google Sheets
         log_to_sheet(result)

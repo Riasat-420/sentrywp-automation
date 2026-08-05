@@ -35,12 +35,16 @@ jobs:
           GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_BOT_TOKEN:    ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
+          # --- WhatsApp via UltraMsg ---
+          ULTRAMSG_INSTANCE:     ${{ secrets.ULTRAMSG_INSTANCE }}
+          ULTRAMSG_TOKEN:        ${{ secrets.ULTRAMSG_TOKEN }}
+          WHATSAPP_NUMBER:       ${{ secrets.WHATSAPP_NUMBER }}
           # --- All FTP credentials (encrypted JSON blob) ---
           SITES_CONFIG:          ${{ secrets.SITES_CONFIG }}
-          # --- Optional: Google Sheets logging ---
+          # --- Google Sheets logging ---
           GSHEET_ID:             ${{ secrets.GSHEET_ID }}
           GSHEET_CREDENTIALS:    ${{ secrets.GSHEET_CREDENTIALS }}
-          # --- Optional: Email (SMTP) ---
+          # --- Email (Gmail SMTP) ---
           SMTP_HOST:             ${{ secrets.SMTP_HOST }}
           SMTP_USER:             ${{ secrets.SMTP_USER }}
           SMTP_PASS:             ${{ secrets.SMTP_PASS }}

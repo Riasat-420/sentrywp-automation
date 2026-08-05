@@ -1,14 +1,19 @@
 """
-SentryWP — Telegram Notification Module
-=========================================
-Sends instant alerts to your phone via Telegram Bot API.
-100% free, no third-party library needed.
+SentryWP — Notification Module
+================================
+Supports:
+  • Telegram Bot (free, instant alerts)
+  • WhatsApp via UltraMsg (~$15/mo flat)
+  • Email via Gmail SMTP (PDF report delivery)
+
+All credentials come from GitHub Secrets — nothing hardcoded.
 """
 
 import os
 import json
 import urllib.request
 import urllib.parse
+import urllib.error
 import smtplib
 import ssl
 from email.mime.text        import MIMEText
@@ -17,9 +22,17 @@ from email.mime.application import MIMEApplication
 from pathlib import Path
 
 
+# ─── Credentials from GitHub Secrets ─────────────────────────────────────────
+
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 
+# UltraMsg WhatsApp
+ULTRAMSG_INSTANCE  = os.environ.get("ULTRAMSG_INSTANCE", "")   # e.g. instance12345
+ULTRAMSG_TOKEN     = os.environ.get("ULTRAMSG_TOKEN", "")       # API token
+WHATSAPP_NUMBER    = os.environ.get("WHATSAPP_NUMBER", "")      # e.g. 923001234567
+
+# Gmail SMTP
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
@@ -120,6 +133,70 @@ def send_telegram_alert(result: dict) -> bool:
     except Exception as e:
         print(f"  [-] Telegram send failed: {e}")
         return False
+
+
+def send_whatsapp_alert(result: dict) -> bool:
+    """Send WhatsApp alert via UltraMsg API."""
+    if not ULTRAMSG_INSTANCE or not ULTRAMSG_TOKEN or not WHATSAPP_NUMBER:
+        print("  ⚠️  WhatsApp not configured (ULTRAMSG_INSTANCE / ULTRAMSG_TOKEN / WHATSAPP_NUMBER missing)")
+        return False
+
+    ai       = result.get("ai") or {}
+    severity = ai.get("severity", "unknown").upper()
+    emoji    = SEVERITY_EMOJI.get(severity.lower(), "❓")
+
+    # WhatsApp plain text (no Markdown)
+    actions_count = len([a for a in result.get("actions", []) if a != "alert_only"])
+    message = (
+        f"{emoji} *SentryWP Alert*\n\n"
+        f"Site: {result['site_name']}\n"
+        f"URL: {result['url']}\n"
+        f"Severity: {severity}\n"
+        f"Confidence: {ai.get('confidence', 0):.0%}\n"
+        f"Threat: {ai.get('threat_type', 'N/A')}\n\n"
+        f"{ai.get('summary', '')}\n\n"
+        f"{'Auto-fix deployed: ' + str(actions_count) + ' actions taken' if actions_count else 'Manual review required'}\n\n"
+        f"Time: {result['timestamp']} UTC\n"
+        f"- SentryWP by Muhammad Riasat Ali"
+    )
+
+    url     = f"https://api.ultramsg.com/{ULTRAMSG_INSTANCE}/messages/chat"
+    payload = urllib.parse.urlencode({
+        "token":  ULTRAMSG_TOKEN,
+        "to":     WHATSAPP_NUMBER,
+        "body":   message,
+    }).encode("utf-8")
+
+    try:
+        req = urllib.request.Request(url, data=payload, method="POST")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read())
+            if body.get("sent") == "true" or body.get("id"):
+                print(f"  💬 WhatsApp alert sent for {result['site_name']}")
+                return True
+            else:
+                print(f"  [-] UltraMsg error: {body}")
+                return False
+    except Exception as e:
+        print(f"  [-] WhatsApp send failed: {e}")
+        return False
+
+
+def send_all_alerts(result: dict) -> None:
+    """
+    Fire all configured notification channels simultaneously.
+    Telegram + WhatsApp both send if credentials are set.
+    Either one failing does NOT block the other.
+    """
+    ai       = result.get("ai") or {}
+    severity = ai.get("severity", "unknown")
+
+    if severity == "clean":
+        return  # Silent on clean scans
+
+    send_telegram_alert(result)
+    send_whatsapp_alert(result)
 
 
 def send_email_report(pdf_path: Path, client: dict, result: dict) -> bool:
