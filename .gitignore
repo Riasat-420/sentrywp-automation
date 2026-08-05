@@ -1,0 +1,20 @@
+# Runtime outputs (never commit these)
+scan_results/
+reports/
+*.pdf
+*.html
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Local temp files
+root_htaccess.txt
+uploads_htaccess.txt
+*.tmp
+
+# Editor
+.vscode/
+.idea/

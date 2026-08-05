@@ -1,0 +1,57 @@
+name: "🛡️ SentryWP — Security Scan (Every 6 Hours)"
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # runs at 00:00, 06:00, 12:00, 18:00 UTC
+  workflow_dispatch:         # allows manual trigger from GitHub UI
+    inputs:
+      site_id:
+        description: "Scan a specific site only (leave blank for all)"
+        required: false
+        default: ""
+
+jobs:
+  security-scan:
+    name: "Scan All Client Sites"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: "📦 Install Dependencies"
+        run: pip install -r requirements.txt
+
+      - name: "🔍 Run Security Scan"
+        env:
+          # --- AI & Notification credentials ---
+          GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN:    ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
+          # --- All FTP credentials (encrypted JSON blob) ---
+          SITES_CONFIG:          ${{ secrets.SITES_CONFIG }}
+          # --- Optional: Google Sheets logging ---
+          GSHEET_ID:             ${{ secrets.GSHEET_ID }}
+          GSHEET_CREDENTIALS:    ${{ secrets.GSHEET_CREDENTIALS }}
+          # --- Optional: Email (SMTP) ---
+          SMTP_HOST:             ${{ secrets.SMTP_HOST }}
+          SMTP_USER:             ${{ secrets.SMTP_USER }}
+          SMTP_PASS:             ${{ secrets.SMTP_PASS }}
+          # --- Manual run: single site filter ---
+          SCAN_SITE_ID:          ${{ github.event.inputs.site_id }}
+        run: python scanner/run_scan.py
+
+      - name: "📤 Upload Scan Results as Artifact"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-results-${{ github.run_number }}
+          path: scan_results/
+          retention-days: 30

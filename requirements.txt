@@ -1,0 +1,11 @@
+# SentryWP Automation — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# PDF generation
+markdown>=3.5
+weasyprint>=61.0
+
+# Google Sheets JWT signing
+cryptography>=42.0
+
+# (All other modules use Python stdlib only: ftplib, urllib, smtplib, ssl, json, etc.)

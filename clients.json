@@ -1,0 +1,18 @@
+[
+  {
+    "id": "kashmir_gems",
+    "name": "Kashmir Gems",
+    "url": "https://kashmirgems.com",
+    "wp_root": "/",
+    "notify_email": "client@kashmirgems.com",
+    "active": true
+  },
+  {
+    "id": "camali_bijoux",
+    "name": "Camali Bijoux",
+    "url": "https://camalibijoux.com",
+    "wp_root": "/",
+    "notify_email": "client@camalibijoux.com",
+    "active": true
+  }
+]

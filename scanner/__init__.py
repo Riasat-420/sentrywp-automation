@@ -1,0 +1,1 @@
+"""SentryWP scanner package"""

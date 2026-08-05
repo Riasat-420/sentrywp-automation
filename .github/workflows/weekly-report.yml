@@ -1,0 +1,51 @@
+name: "📋 SentryWP — Weekly Deep Scan + Client PDF Reports"
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"   # Every Sunday at 00:00 UTC
+  workflow_dispatch:       # Manual trigger
+
+jobs:
+  weekly-deep-scan:
+    name: "Full 5-Layer Scan + Client Reports"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: "📦 Install Dependencies"
+        run: pip install -r requirements.txt
+
+      - name: "🔍 Run Full 5-Layer Deep Scan + Reports"
+        env:
+          GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN:    ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
+          SITES_CONFIG:          ${{ secrets.SITES_CONFIG }}
+          GSHEET_ID:             ${{ secrets.GSHEET_ID }}
+          GSHEET_CREDENTIALS:    ${{ secrets.GSHEET_CREDENTIALS }}
+          SMTP_HOST:             ${{ secrets.SMTP_HOST }}
+          SMTP_USER:             ${{ secrets.SMTP_USER }}
+          SMTP_PASS:             ${{ secrets.SMTP_PASS }}
+          # Flag to run full deep scan mode + generate PDFs
+          SCAN_MODE:             "deep"
+          GENERATE_REPORTS:      "true"
+        run: python scanner/run_scan.py
+
+      - name: "📄 Upload Weekly Reports"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-reports-${{ github.run_number }}
+          path: |
+            scan_results/
+            reports/
+          retention-days: 90
